@@ -21,6 +21,9 @@ Thumbs.db
 apps/api/prisma/dev.db
 apps/api/generated/
 
+# Redis dump gerado por uma instância local rodando fora do Docker
+dump.rdb
+
 # Certificados / segredos (nunca versionar)
 *.pfx
 *.pem

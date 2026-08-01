@@ -18,7 +18,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    // O .env do projeto fica na raiz do monorepo (junto do docker-compose.yml);
+    // apps/api/.env é aceito também, para o caso de builds/containers isolados.
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
