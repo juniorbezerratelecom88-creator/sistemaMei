@@ -2,18 +2,25 @@
 
 import { FormEvent, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ShieldCheck } from 'lucide-react';
 import { apiFetch, setTokens } from '../../../lib/api-client';
+import { Button } from '../../../components/ui/Button';
+import { Alert } from '../../../components/ui/Alert';
+import { usePageTitle } from '../../../lib/use-page-title';
 
 function TwoFactorForm() {
+  usePageTitle('Verificação em duas etapas');
   const router = useRouter();
   const searchParams = useSearchParams();
   const twoFactorToken = searchParams.get('token') ?? '';
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setLoading(true);
     try {
       const result = await apiFetch<{ accessToken: string; refreshToken: string }>(
         '/auth/2fa/login-verify',
@@ -27,21 +34,26 @@ function TwoFactorForm() {
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Código inválido.');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm"
+        className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl"
       >
-        <h1 className="mb-1 text-xl font-bold text-brand-700">Verificação em duas etapas</h1>
-        <p className="mb-6 text-sm text-slate-500">Digite o código do seu app autenticador</p>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-md">
+            <ShieldCheck className="h-7 w-7 text-white" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Verificação em duas etapas</h1>
+          <p className="text-sm text-slate-500">Digite o código do seu app autenticador</p>
+        </div>
 
-        {error && (
-          <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        )}
+        {error && <Alert variant="error">{error}</Alert>}
 
         <input
           inputMode="numeric"
@@ -49,15 +61,12 @@ function TwoFactorForm() {
           required
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          className="mb-6 w-full rounded-md border border-slate-300 px-3 py-2 text-center text-lg tracking-widest"
+          className="mb-6 w-full rounded-md border border-slate-300 px-3 py-2 text-center text-lg tracking-widest focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
 
-        <button
-          type="submit"
-          className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-        >
+        <Button type="submit" loading={loading} fullWidth>
           Confirmar
-        </button>
+        </Button>
       </form>
     </div>
   );

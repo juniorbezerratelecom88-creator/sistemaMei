@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { FileText } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
+import { PageHeader } from '../../components/PageHeader';
+import { Alert } from '../../components/ui/Alert';
+import { Badge, type BadgeVariant } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { TableSkeleton } from '../../components/ui/Skeleton';
 import { apiFetch } from '../../lib/api-client';
+import { usePageTitle } from '../../lib/use-page-title';
 
 interface NotaFiscal {
   id: string;
@@ -15,67 +22,85 @@ interface NotaFiscal {
   createdAt: string;
 }
 
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  AUTORIZADA: 'success',
+  CANCELADA: 'neutral',
+  ERRO: 'danger',
+  PROCESSANDO: 'info',
+};
+
 export default function NotasPage() {
+  usePageTitle('Notas Fiscais');
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch<NotaFiscal[]>('/nfe')
       .then(setNotas)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar notas.'));
+      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar notas.'))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-bold text-slate-900">Notas Fiscais</h1>
+      <PageHeader
+        title="Notas Fiscais"
+        description="Emitidas a partir de vendas concluídas no PDV"
+        icon={FileText}
+        color="violet"
+      />
 
-      {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <Alert variant="error" onDismiss={() => setError(null)}>{error}</Alert>}
 
-      <p className="mb-4 text-sm text-slate-500">
-        A emissão de notas é feita a partir de uma venda concluída no PDV.
-      </p>
-
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Número/Série</th>
-              <th className="px-4 py-3">Valor</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">PDF</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {notas.map((nota) => (
-              <tr key={nota.id}>
-                <td className="px-4 py-3">{nota.tipo}</td>
-                <td className="px-4 py-3">
-                  {nota.numero}/{nota.serie}
-                </td>
-                <td className="px-4 py-3">
-                  {Number(nota.valorTotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </td>
-                <td className="px-4 py-3">{nota.status}</td>
-                <td className="px-4 py-3">
-                  {nota.pdfUrl && (
-                    <a href={nota.pdfUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
-                      Abrir
-                    </a>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {notas.length === 0 && (
+      {loading ? (
+        <TableSkeleton rows={3} cols={5} />
+      ) : notas.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-white">
+          <EmptyState
+            icon={FileText}
+            title="Nenhuma nota emitida ainda"
+            description="A emissão de notas é feita a partir de uma venda concluída no PDV."
+          />
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
-                  Nenhuma nota emitida ainda.
-                </td>
+                <th className="px-4 py-3">Tipo</th>
+                <th className="px-4 py-3">Número/Série</th>
+                <th className="px-4 py-3">Valor</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">PDF</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {notas.map((nota) => (
+                <tr key={nota.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3">{nota.tipo}</td>
+                  <td className="px-4 py-3">
+                    {nota.numero}/{nota.serie}
+                  </td>
+                  <td className="px-4 py-3">
+                    {Number(nota.valorTotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={STATUS_VARIANT[nota.status] ?? 'neutral'}>{nota.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    {nota.pdfUrl && (
+                      <a href={nota.pdfUrl} target="_blank" rel="noreferrer" className="font-medium text-violet-600 hover:underline">
+                        Abrir
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </AppShell>
   );
 }

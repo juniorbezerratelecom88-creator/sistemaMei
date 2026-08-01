@@ -2,27 +2,38 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import type { AtividadeMei, Empresa } from '@sistema-mei/shared-types';
+import { Building2 } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
+import { PageHeader } from '../../components/PageHeader';
+import { Alert } from '../../components/ui/Alert';
+import { Button } from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { apiFetch } from '../../lib/api-client';
+import { usePageTitle } from '../../lib/use-page-title';
 
 export default function EmpresaPage() {
+  usePageTitle('Empresa');
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
+  const [loading, setLoading] = useState(true);
   const [cnpj, setCnpj] = useState('');
   const [razaoSocial, setRazaoSocial] = useState('');
   const [atividade, setAtividade] = useState<AtividadeMei>('COMERCIO' as AtividadeMei);
   const [dataAbertura, setDataAbertura] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     apiFetch<Empresa>('/empresas/atual')
       .then(setEmpresa)
-      .catch(() => setEmpresa(null));
+      .catch(() => setEmpresa(null))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setSalvando(true);
     try {
       const nova = await apiFetch<Empresa>('/empresas', {
         method: 'POST',
@@ -32,14 +43,23 @@ export default function EmpresaPage() {
       setMessage('Empresa criada. Faça login novamente para atualizar suas permissões.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar empresa.');
+    } finally {
+      setSalvando(false);
     }
   }
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-bold text-slate-900">Empresa</h1>
+      <PageHeader title="Empresa" description="Dados cadastrais do seu MEI" icon={Building2} color="teal" />
 
-      {empresa ? (
+      {loading ? (
+        <div className="max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <Skeleton className="mb-2 h-3 w-20" />
+          <Skeleton className="mb-4 h-5 w-48" />
+          <Skeleton className="mb-2 h-3 w-20" />
+          <Skeleton className="h-5 w-36" />
+        </div>
+      ) : empresa ? (
         <div className="max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Razão social</p>
           <p className="mb-3 text-lg font-medium">{empresa.razaoSocial}</p>
@@ -53,8 +73,8 @@ export default function EmpresaPage() {
           <p className="mb-4 text-sm text-slate-500">
             Cadastre os dados do seu MEI para começar a usar o sistema.
           </p>
-          {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-          {message && <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>}
+          {error && <Alert variant="error">{error}</Alert>}
+          {message && <Alert variant="success">{message}</Alert>}
 
           <label className="mb-1 block text-sm font-medium">CNPJ</label>
           <input
@@ -62,7 +82,7 @@ export default function EmpresaPage() {
             value={cnpj}
             onChange={(e) => setCnpj(e.target.value)}
             placeholder="Somente números"
-            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
           />
 
           <label className="mb-1 block text-sm font-medium">Razão social</label>
@@ -70,7 +90,7 @@ export default function EmpresaPage() {
             required
             value={razaoSocial}
             onChange={(e) => setRazaoSocial(e.target.value)}
-            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
           />
 
           <label className="mb-1 block text-sm font-medium">Atividade</label>
@@ -93,12 +113,9 @@ export default function EmpresaPage() {
             className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
 
-          <button
-            type="submit"
-            className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-          >
+          <Button type="submit" loading={salvando} fullWidth>
             Cadastrar empresa
-          </button>
+          </Button>
         </form>
       )}
     </AppShell>

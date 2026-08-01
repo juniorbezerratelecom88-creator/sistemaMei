@@ -24,6 +24,8 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+export const SESSION_EXPIRED_EVENT = 'sistema-mei:session-expired';
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -71,6 +73,8 @@ export async function apiFetch<T = unknown>(
     if (newAccessToken) {
       headers.set('Authorization', `Bearer ${newAccessToken}`);
       response = await fetch(`${API_URL}${path}`, { ...options, headers });
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
   }
 
@@ -79,6 +83,9 @@ export async function apiFetch<T = unknown>(
     throw new ApiError(response.status, body.message ?? 'Erro na requisição');
   }
 
+  // Alguns endpoints (ex: "recurso atual ou null") respondem 200 com corpo vazio
+  // quando não há nada a retornar — não presumir que toda resposta OK tem JSON.
   if (response.status === 204) return undefined as T;
-  return response.json();
+  const text = await response.text();
+  return (text ? JSON.parse(text) : null) as T;
 }

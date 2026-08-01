@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import type { FormaPagamento, Produto } from '@sistema-mei/shared-types';
+import { Lock, Package, ShoppingCart } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
+import { PageHeader } from '../../components/PageHeader';
+import { Alert } from '../../components/ui/Alert';
+import { Button } from '../../components/ui/Button';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { apiFetch } from '../../lib/api-client';
+import { usePageTitle } from '../../lib/use-page-title';
 
 interface Caixa {
   id: string;
@@ -19,6 +27,7 @@ interface ItemCarrinho {
 }
 
 export default function PdvPage() {
+  usePageTitle('PDV');
   const [caixa, setCaixa] = useState<Caixa | null>(null);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
@@ -26,6 +35,12 @@ export default function PdvPage() {
   const [valorAbertura, setValorAbertura] = useState('100');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [abrindoCaixa, setAbrindoCaixa] = useState(false);
+  const [finalizandoVenda, setFinalizandoVenda] = useState(false);
+  const [fecharCaixaOpen, setFecharCaixaOpen] = useState(false);
+  const [valorFechamento, setValorFechamento] = useState('0');
+  const [fechandoCaixa, setFechandoCaixa] = useState(false);
 
   async function carregar() {
     const [caixaAtual, listaProdutos] = await Promise.all([
@@ -37,11 +52,14 @@ export default function PdvPage() {
   }
 
   useEffect(() => {
-    carregar().catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar PDV.'));
+    carregar()
+      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar PDV.'))
+      .finally(() => setLoading(false));
   }, []);
 
   async function abrirCaixa() {
     setError(null);
+    setAbrindoCaixa(true);
     try {
       await apiFetch('/pdv/caixa/abrir', {
         method: 'POST',
@@ -50,6 +68,28 @@ export default function PdvPage() {
       await carregar();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao abrir caixa.');
+    } finally {
+      setAbrindoCaixa(false);
+    }
+  }
+
+  async function confirmarFecharCaixa() {
+    if (!caixa) return;
+    setError(null);
+    setFechandoCaixa(true);
+    try {
+      await apiFetch(`/pdv/caixa/${caixa.id}/fechar`, {
+        method: 'POST',
+        body: JSON.stringify({ valorFechamento: Number(valorFechamento) }),
+      });
+      setFecharCaixaOpen(false);
+      setCarrinho([]);
+      setMessage('Caixa fechado com sucesso.');
+      await carregar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao fechar caixa.');
+    } finally {
+      setFechandoCaixa(false);
     }
   }
 
@@ -73,6 +113,7 @@ export default function PdvPage() {
   async function finalizarVenda() {
     setError(null);
     setMessage(null);
+    setFinalizandoVenda(true);
     try {
       await apiFetch('/pdv/vendas', {
         method: 'POST',
@@ -86,51 +127,91 @@ export default function PdvPage() {
       await carregar();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao registrar venda.');
+    } finally {
+      setFinalizandoVenda(false);
     }
   }
 
+  const caixaAberto = caixa && caixa.status === 'ABERTO';
+
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-bold text-slate-900">PDV</h1>
+      <PageHeader
+        title="PDV"
+        description="Frente de caixa"
+        icon={ShoppingCart}
+        color="emerald"
+        actions={
+          caixaAberto ? (
+            <Button
+              variant="secondary"
+              icon={<Lock className="h-4 w-4" />}
+              onClick={() => {
+                setValorFechamento(String(Number(caixa!.valorAbertura) + total));
+                setFecharCaixaOpen(true);
+              }}
+            >
+              Fechar caixa
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      {message && <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>}
+      {error && <Alert variant="error" onDismiss={() => setError(null)}>{error}</Alert>}
+      {message && (
+        <Alert variant="success" onDismiss={() => setMessage(null)} autoDismiss={4000}>
+          {message}
+        </Alert>
+      )}
 
-      {!caixa || caixa.status === 'FECHADO' ? (
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
+      ) : !caixaAberto ? (
         <div className="max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <p className="mb-3 text-sm text-slate-500">Nenhum caixa aberto. Informe o valor inicial:</p>
           <input
             type="number"
             value={valorAbertura}
             onChange={(e) => setValorAbertura(e.target.value)}
-            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
-          <button
-            onClick={abrirCaixa}
-            className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-          >
+          <Button onClick={abrirCaixa} loading={abrindoCaixa} fullWidth>
             Abrir caixa
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <p className="mb-3 text-sm font-medium text-slate-500">Produtos</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {produtos.map((produto) => (
-                <button
-                  key={produto.id}
-                  onClick={() => adicionarAoCarrinho(produto)}
-                  className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-brand-500"
-                >
-                  <p className="text-sm font-medium">{produto.nome}</p>
-                  <p className="text-xs text-slate-500">
-                    {Number(produto.precoVenda).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </p>
-                  <p className="text-xs text-slate-400">Estoque: {produto.estoqueAtual}</p>
-                </button>
-              ))}
-            </div>
+            {produtos.length === 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-white">
+                <EmptyState
+                  icon={Package}
+                  title="Nenhum produto cadastrado"
+                  description="Cadastre produtos pela API para começar a vender."
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {produtos.map((produto) => (
+                  <button
+                    key={produto.id}
+                    onClick={() => adicionarAoCarrinho(produto)}
+                    className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-md"
+                  >
+                    <p className="text-sm font-medium">{produto.nome}</p>
+                    <p className="text-xs text-emerald-600">
+                      {Number(produto.precoVenda).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                    <p className="text-xs text-slate-400">Estoque: {produto.estoqueAtual}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -168,17 +249,36 @@ export default function PdvPage() {
                 <option value="CREDITO">Crédito</option>
               </select>
 
-              <button
+              <Button
                 disabled={carrinho.length === 0}
+                loading={finalizandoVenda}
                 onClick={finalizarVenda}
-                className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                fullWidth
               >
                 Finalizar venda
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={fecharCaixaOpen}
+        title="Fechar caixa"
+        description="Confira o valor final em caixa antes de confirmar. Essa ação encerra o dia."
+        confirmLabel="Fechar caixa"
+        loading={fechandoCaixa}
+        onCancel={() => setFecharCaixaOpen(false)}
+        onConfirm={confirmarFecharCaixa}
+      >
+        <label className="mb-1 block text-sm font-medium text-slate-700">Valor de fechamento</label>
+        <input
+          type="number"
+          value={valorFechamento}
+          onChange={(e) => setValorFechamento(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+      </ConfirmDialog>
     </AppShell>
   );
 }

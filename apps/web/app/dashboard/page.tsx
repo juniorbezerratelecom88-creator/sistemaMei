@@ -2,18 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import type { DashboardResumo, TermometroFaturamento } from '@sistema-mei/shared-types';
+import { DollarSign, LayoutDashboard, PiggyBank, Receipt, ShoppingBag } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
+import { PageHeader } from '../../components/PageHeader';
 import { StatCard } from '../../components/StatCard';
+import { Alert } from '../../components/ui/Alert';
+import { Badge } from '../../components/ui/Badge';
+import { CardSkeleton } from '../../components/ui/Skeleton';
 import { apiFetch } from '../../lib/api-client';
+import { usePageTitle } from '../../lib/use-page-title';
 
 function formatBRL(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export default function DashboardPage() {
+  usePageTitle('Dashboard');
   const [resumo, setResumo] = useState<DashboardResumo | null>(null);
   const [termometro, setTermometro] = useState<TermometroFaturamento | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -24,26 +32,57 @@ export default function DashboardPage() {
         setResumo(resumoData);
         setTermometro(termometroData);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar dashboard.'));
+      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar dashboard.'))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-bold text-slate-900">Dashboard</h1>
+      <PageHeader
+        title="Dashboard"
+        description="Visão geral do seu negócio"
+        icon={LayoutDashboard}
+        color="indigo"
+      />
 
-      {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <Alert variant="error">{error}</Alert>}
 
-      {resumo && (
+      {loading ? (
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Faturamento bruto (mês)" value={formatBRL(resumo.faturamentoBrutoMes)} />
-          <StatCard label="Lucro líquido (mês)" value={formatBRL(resumo.lucroLiquidoMes)} />
-          <StatCard label="Ticket médio" value={formatBRL(resumo.ticketMedio)} />
-          <StatCard
-            label="Status DAS"
-            value={resumo.statusDas?.status ?? '—'}
-            hint={resumo.statusDas ? `Competência ${resumo.statusDas.competencia}` : 'Nenhuma guia gerada'}
-          />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
+      ) : (
+        resumo && (
+          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Faturamento bruto (mês)"
+              value={formatBRL(resumo.faturamentoBrutoMes)}
+              icon={DollarSign}
+              color="emerald"
+            />
+            <StatCard
+              label="Lucro líquido (mês)"
+              value={formatBRL(resumo.lucroLiquidoMes)}
+              icon={PiggyBank}
+              color="indigo"
+            />
+            <StatCard
+              label="Ticket médio"
+              value={formatBRL(resumo.ticketMedio)}
+              icon={ShoppingBag}
+              color="amber"
+            />
+            <StatCard
+              label="Status DAS"
+              value={resumo.statusDas?.status ?? '—'}
+              hint={resumo.statusDas ? `Competência ${resumo.statusDas.competencia}` : 'Nenhuma guia gerada'}
+              icon={Receipt}
+              color={resumo.statusDas?.status === 'PAGO' ? 'emerald' : resumo.statusDas?.status === 'VENCIDO' ? 'red' : 'violet'}
+            />
+          </div>
+        )
       )}
 
       {termometro && (
@@ -51,7 +90,7 @@ export default function DashboardPage() {
           <p className="mb-2 text-sm font-medium text-slate-500">Termômetro do teto MEI</p>
           <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
             <div
-              className={`h-full ${termometro.percentual >= 90 ? 'bg-red-500' : termometro.percentual >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+              className={`h-full transition-all ${termometro.percentual >= 90 ? 'bg-red-500' : termometro.percentual >= 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`}
               style={{ width: `${Math.min(termometro.percentual, 100)}%` }}
             />
           </div>
@@ -60,9 +99,9 @@ export default function DashboardPage() {
             {termometro.percentual}%)
           </p>
           {termometro.alerta && (
-            <p className="mt-1 text-sm font-medium text-amber-600">
-              Atenção: faturamento já atingiu {termometro.alerta} do teto proporcional.
-            </p>
+            <div className="mt-2">
+              <Badge variant="warning">Atenção: já atingiu {termometro.alerta} do teto proporcional</Badge>
+            </div>
           )}
         </div>
       )}
