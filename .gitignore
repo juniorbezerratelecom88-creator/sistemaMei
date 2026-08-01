@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+*.log
+npm-debug.log*
+
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/dev.db
+apps/api/generated/
+
+# Certificados / segredos (nunca versionar)
+*.pfx
+*.pem
+*.key
+
+.vscode/
+.idea/

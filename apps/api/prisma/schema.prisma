@@ -1,0 +1,365 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== Auth / RBAC =====================
+
+enum RoleName {
+  OWNER
+  ADMIN
+  OPERADOR
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  passwordHash          String
+  name                  String
+  telefone              String? // usado para alertas via WhatsApp
+  role                  RoleName  @default(OPERADOR)
+  empresaId             String?
+  empresa               Empresa?  @relation(fields: [empresaId], references: [id])
+  isTwoFactorEnabled    Boolean   @default(false)
+  twoFactorSecretCipher String? // segredo TOTP criptografado (AES-256-GCM)
+  refreshTokens         RefreshToken[]
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([empresaId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ===================== Empresa (MEI) =====================
+
+enum AtividadeMei {
+  COMERCIO
+  INDUSTRIA
+  SERVICOS
+}
+
+model Empresa {
+  id            String        @id @default(uuid())
+  cnpj          String        @unique
+  razaoSocial   String
+  nomeFantasia  String?
+  atividade     AtividadeMei
+  dataAbertura  DateTime
+  users         User[]
+  certificado   Certificado?
+  dasGuias      DasGuia[]
+  notasFiscais  NotaFiscal[]
+  produtos      Produto[]
+  caixas        Caixa[]
+  vendas        Venda[]
+  contasPagar   ContaPagar[]
+  contasReceber ContaReceber[]
+  contasBancarias ContaBancaria[]
+  notificacoes  NotificacaoLog[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// Metadados do certificado digital e-CNPJ A1 (.pfx). O conteudo binario
+// fica criptografado (AES-256-GCM) - em producao isso deve ser trocado
+// por um Vault/KMS dedicado (ex: HashiCorp Vault, AWS KMS + S3 privado).
+model Certificado {
+  id                  String   @id @default(uuid())
+  empresaId           String   @unique
+  empresa             Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nomeArquivo         String
+  conteudoCifrado     String // base64 do payload cifrado
+  senhaCifrada        String // senha do .pfx cifrada
+  validade             DateTime
+  createdAt           DateTime @default(now())
+}
+
+// ===================== Fiscal (DAS) =====================
+
+enum DasStatus {
+  PENDENTE
+  PAGO
+  VENCIDO
+}
+
+model DasGuia {
+  id              String    @id @default(uuid())
+  empresaId       String
+  empresa         Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  competencia     String // formato "YYYY-MM"
+  valor           Decimal   @db.Decimal(10, 2)
+  vencimento      DateTime
+  status          DasStatus @default(PENDENTE)
+  pixCopiaECola   String?
+  qrCodeUrl       String?
+  codigoBarras    String?
+  pagoEm          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@unique([empresaId, competencia])
+  @@index([empresaId])
+}
+
+// ===================== Notas Fiscais =====================
+
+enum TipoNota {
+  NFSE
+  NFE
+  NFCE
+}
+
+enum StatusNota {
+  PROCESSANDO
+  AUTORIZADA
+  CANCELADA
+  ERRO
+}
+
+model NotaFiscal {
+  id                 String     @id @default(uuid())
+  empresaId          String
+  empresa            Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  vendaId            String?    @unique
+  venda              Venda?     @relation(fields: [vendaId], references: [id])
+  tipo               TipoNota
+  numero             String
+  serie              String
+  status             StatusNota @default(PROCESSANDO)
+  xmlUrl             String?
+  pdfUrl             String?
+  valorTotal         Decimal    @db.Decimal(10, 2)
+  clienteNome        String?
+  clienteDocumento   String?
+  clienteEmail       String?
+  createdAt          DateTime   @default(now())
+
+  @@index([empresaId])
+}
+
+// ===================== PDV =====================
+
+model Produto {
+  id              String   @id @default(uuid())
+  empresaId       String
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome            String
+  sku             String?
+  precoVenda      Decimal  @db.Decimal(10, 2)
+  custoUnitario   Decimal  @db.Decimal(10, 2) @default(0)
+  estoqueAtual    Int      @default(0)
+  estoqueMinimo   Int      @default(0)
+  vendaItens      VendaItem[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([empresaId])
+}
+
+enum CaixaStatus {
+  ABERTO
+  FECHADO
+}
+
+model Caixa {
+  id              String    @id @default(uuid())
+  empresaId       String
+  empresa         Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  abertoPorId     String
+  valorAbertura   Decimal   @db.Decimal(10, 2)
+  valorFechamento Decimal?  @db.Decimal(10, 2)
+  status          CaixaStatus @default(ABERTO)
+  movimentos      MovimentoCaixa[]
+  vendas          Venda[]
+  abertoEm        DateTime  @default(now())
+  fechadoEm       DateTime?
+
+  @@index([empresaId])
+}
+
+enum TipoMovimentoCaixa {
+  VENDA
+  SANGRIA
+  SUPRIMENTO
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  PIX
+  DEBITO
+  CREDITO
+}
+
+model MovimentoCaixa {
+  id             String             @id @default(uuid())
+  caixaId        String
+  caixa          Caixa              @relation(fields: [caixaId], references: [id], onDelete: Cascade)
+  tipo           TipoMovimentoCaixa
+  valor          Decimal            @db.Decimal(10, 2)
+  formaPagamento FormaPagamento?
+  descricao      String?
+  createdAt      DateTime           @default(now())
+
+  @@index([caixaId])
+}
+
+enum VendaStatus {
+  CONCLUIDA
+  CANCELADA
+}
+
+model Venda {
+  id                String         @id @default(uuid())
+  empresaId         String
+  empresa           Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  caixaId           String
+  caixa             Caixa          @relation(fields: [caixaId], references: [id])
+  clienteNome       String?
+  clienteDocumento  String?
+  valorTotal        Decimal        @db.Decimal(10, 2)
+  formaPagamento    FormaPagamento
+  status            VendaStatus    @default(CONCLUIDA)
+  itens             VendaItem[]
+  notaFiscal        NotaFiscal?
+  createdAt         DateTime       @default(now())
+
+  @@index([empresaId])
+  @@index([caixaId])
+}
+
+model VendaItem {
+  id             String  @id @default(uuid())
+  vendaId        String
+  venda          Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  produtoId      String
+  produto        Produto @relation(fields: [produtoId], references: [id])
+  quantidade     Int
+  precoUnitario  Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
+
+  @@index([vendaId])
+}
+
+// ===================== Financeiro =====================
+
+enum ContaPagarStatus {
+  PENDENTE
+  PAGO
+  ATRASADO
+}
+
+model ContaPagar {
+  id          String           @id @default(uuid())
+  empresaId   String
+  empresa     Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  descricao   String
+  categoria   String
+  valor       Decimal          @db.Decimal(10, 2)
+  vencimento  DateTime
+  status      ContaPagarStatus @default(PENDENTE)
+  pagoEm      DateTime?
+  recorrente  Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@index([empresaId])
+}
+
+enum ContaReceberStatus {
+  PENDENTE
+  RECEBIDO
+  ATRASADO
+}
+
+model ContaReceber {
+  id          String             @id @default(uuid())
+  empresaId   String
+  empresa     Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  descricao   String
+  categoria   String
+  valor       Decimal            @db.Decimal(10, 2)
+  vencimento  DateTime
+  status      ContaReceberStatus @default(PENDENTE)
+  recebidoEm  DateTime?
+  recorrente  Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+
+  @@index([empresaId])
+}
+
+// Conexao Open Finance - token de acesso cifrado (AES-256-GCM)
+model ContaBancaria {
+  id                    String   @id @default(uuid())
+  empresaId             String
+  empresa               Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  provider              String // ex: "pluggy", "belvo", "mock"
+  apelido               String
+  accessTokenCifrado    String
+  ultimaSincronizacao   DateTime?
+  transacoes            TransacaoBancaria[]
+  createdAt             DateTime @default(now())
+
+  @@index([empresaId])
+}
+
+enum TipoTransacaoBancaria {
+  CREDITO
+  DEBITO
+}
+
+model TransacaoBancaria {
+  id              String                 @id @default(uuid())
+  contaBancariaId String
+  contaBancaria   ContaBancaria          @relation(fields: [contaBancariaId], references: [id], onDelete: Cascade)
+  dataTransacao   DateTime
+  descricao       String
+  valor           Decimal                @db.Decimal(10, 2)
+  tipo            TipoTransacaoBancaria
+  conciliada      Boolean                @default(false)
+  contaPagarId    String?
+  contaReceberId  String?
+  createdAt       DateTime               @default(now())
+
+  @@index([contaBancariaId])
+}
+
+// ===================== Notificações =====================
+
+enum CanalNotificacao {
+  EMAIL
+  WHATSAPP
+  PUSH
+}
+
+enum StatusNotificacao {
+  ENVIADO
+  FALHA
+}
+
+model NotificacaoLog {
+  id               String            @id @default(uuid())
+  empresaId        String
+  empresa          Empresa           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  canal            CanalNotificacao
+  destinatario     String
+  assunto          String
+  status           StatusNotificacao
+  referenciaTipo   String? // ex: "DasGuia", "NotaFiscal"
+  referenciaId     String?
+  createdAt        DateTime          @default(now())
+
+  @@index([empresaId])
+}
