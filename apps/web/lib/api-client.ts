@@ -80,7 +80,8 @@ export async function apiFetch<T = unknown>(
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({ message: response.statusText }));
-    throw new ApiError(response.status, body.message ?? 'Erro na requisição');
+    const message = Array.isArray(body.message) ? body.message.join(' ') : body.message;
+    throw new ApiError(response.status, message ?? 'Erro na requisição');
   }
 
   // Alguns endpoints (ex: "recurso atual ou null") respondem 200 com corpo vazio

@@ -27,6 +27,7 @@ model User {
   isTwoFactorEnabled    Boolean   @default(false)
   twoFactorSecretCipher String? // segredo TOTP criptografado (AES-256-GCM)
   refreshTokens         RefreshToken[]
+  auditLogs             AuditLog[]
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -60,6 +61,9 @@ model Empresa {
   nomeFantasia  String?
   atividade     AtividadeMei
   dataAbertura  DateTime
+  logoUrl       String?
+  corPrimaria   String? // hex, ex: "#4f46e5" - identidade visual usada no painel web
+  corSecundaria String?
   users         User[]
   certificado   Certificado?
   dasGuias      DasGuia[]
@@ -71,6 +75,7 @@ model Empresa {
   contasReceber ContaReceber[]
   contasBancarias ContaBancaria[]
   notificacoes  NotificacaoLog[]
+  auditLogs     AuditLog[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -362,4 +367,30 @@ model NotificacaoLog {
   createdAt        DateTime          @default(now())
 
   @@index([empresaId])
+}
+
+// ===================== Auditoria =====================
+
+enum EventoAuditoria {
+  LOGIN_SUCESSO
+  LOGIN_2FA_SUCESSO
+  LOGIN_FALHA
+}
+
+model AuditLog {
+  id        String          @id @default(uuid())
+  userId    String?
+  user      User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  empresaId String?
+  empresa   Empresa?        @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+  email     String
+  evento    EventoAuditoria
+  ip        String
+  userAgent String?
+  cidade    String?
+  pais      String?
+  createdAt DateTime        @default(now())
+
+  @@index([empresaId])
+  @@index([userId])
 }

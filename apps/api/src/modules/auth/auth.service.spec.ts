@@ -13,6 +13,7 @@ describe('AuthService', () => {
   let jwt: { sign: jest.Mock };
   let config: { get: jest.Mock };
   let crypto: CryptoService;
+  let auditoria: { registrar: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
@@ -30,12 +31,14 @@ describe('AuthService', () => {
     };
     crypto = new CryptoService(config as any);
     crypto.onModuleInit();
+    auditoria = { registrar: jest.fn().mockResolvedValue({}) };
 
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwt as any,
       config as any,
       crypto,
+      auditoria as any,
     );
   });
 
@@ -53,8 +56,14 @@ describe('AuthService', () => {
     });
 
     await expect(
-      service.login({ email: 'a@b.com', password: 'senha-errada' }),
+      service.login(
+        { email: 'a@b.com', password: 'senha-errada' },
+        '127.0.0.1',
+      ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ evento: 'LOGIN_FALHA' }),
+    );
   });
 
   it('emite tokens ao logar com credenciais corretas e sem 2FA', async () => {
@@ -70,14 +79,17 @@ describe('AuthService', () => {
       isTwoFactorEnabled: false,
     });
 
-    const result = await service.login({
-      email: 'a@b.com',
-      password: 'senha-correta',
-    });
+    const result = await service.login(
+      { email: 'a@b.com', password: 'senha-correta' },
+      '127.0.0.1',
+    );
 
     expect(result).toHaveProperty('accessToken');
     expect(result).toHaveProperty('refreshToken');
     expect(prisma.refreshToken.create).toHaveBeenCalled();
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ evento: 'LOGIN_SUCESSO' }),
+    );
   });
 
   it('exige verificação 2FA quando habilitado, sem emitir tokens finais', async () => {
@@ -93,15 +105,16 @@ describe('AuthService', () => {
       isTwoFactorEnabled: true,
     });
 
-    const result = await service.login({
-      email: 'a@b.com',
-      password: 'senha-correta',
-    });
+    const result = await service.login(
+      { email: 'a@b.com', password: 'senha-correta' },
+      '127.0.0.1',
+    );
 
     expect(result).toEqual({
       requiresTwoFactor: true,
       twoFactorToken: 'fake-access-token',
     });
     expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(auditoria.registrar).not.toHaveBeenCalled();
   });
 });

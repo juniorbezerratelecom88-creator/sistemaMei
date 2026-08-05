@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Identidade de marca padrão (índigo/violeta) - sobrescrita em runtime por
+     apply-brand-theme.ts quando a empresa define corPrimaria/corSecundaria. */
+  --brand-primary: #4f46e5;
+  --brand-primary-hover: #4338ca;
+  --brand-secondary: #7c3aed;
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }

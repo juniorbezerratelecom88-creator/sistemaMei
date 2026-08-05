@@ -4,10 +4,12 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -17,6 +19,11 @@ import { TwoFactorEnableDto } from './dto/two-factor-enable.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from './auth.types';
+
+/** Normaliza IPv4-mapeado-em-IPv6 (ex: "::ffff:127.0.0.1" -> "127.0.0.1") para exibição. */
+function requestIp(req: Request): string {
+  return (req.ip ?? '').replace(/^::ffff:/, '');
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -31,15 +38,24 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.authService.login(
+      dto,
+      requestIp(req),
+      req.headers['user-agent'],
+    );
   }
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('2fa/login-verify')
-  verifyTwoFactorLogin(@Body() dto: TwoFactorVerifyDto) {
-    return this.authService.verifyTwoFactorLogin(dto.twoFactorToken, dto.code);
+  verifyTwoFactorLogin(@Body() dto: TwoFactorVerifyDto, @Req() req: Request) {
+    return this.authService.verifyTwoFactorLogin(
+      dto.twoFactorToken,
+      dto.code,
+      requestIp(req),
+      req.headers['user-agent'],
+    );
   }
 
   @ApiBearerAuth()

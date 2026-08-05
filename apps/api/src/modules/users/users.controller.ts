@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { IsEnum } from 'class-validator';
@@ -8,6 +16,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
 
 class UpdateRoleDto {
   @IsEnum(RoleName)
@@ -24,6 +33,12 @@ export class UsersController {
   @Get()
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.findAllByEmpresa(user.empresaId as string);
+  }
+
+  @Roles(RoleName.OWNER, RoleName.ADMIN)
+  @Post()
+  create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateUserDto) {
+    return this.usersService.create(user.empresaId as string, dto, user.role);
   }
 
   @Roles(RoleName.OWNER, RoleName.ADMIN)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FormaPagamento, Produto } from '@sistema-mei/shared-types';
-import { Lock, Package, ShoppingCart } from 'lucide-react';
+import { Lock, Package, Plus, ShoppingCart } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert } from '../../components/ui/Alert';
@@ -41,6 +41,16 @@ export default function PdvPage() {
   const [fecharCaixaOpen, setFecharCaixaOpen] = useState(false);
   const [valorFechamento, setValorFechamento] = useState('0');
   const [fechandoCaixa, setFechandoCaixa] = useState(false);
+  const [novoProdutoOpen, setNovoProdutoOpen] = useState(false);
+  const [novoProduto, setNovoProduto] = useState({
+    nome: '',
+    sku: '',
+    precoVenda: '',
+    custoUnitario: '',
+    estoqueAtual: '',
+    estoqueMinimo: '',
+  });
+  const [criandoProduto, setCriandoProduto] = useState(false);
 
   async function carregar() {
     const [caixaAtual, listaProdutos] = await Promise.all([
@@ -93,6 +103,32 @@ export default function PdvPage() {
     }
   }
 
+  async function criarProduto() {
+    setError(null);
+    setCriandoProduto(true);
+    try {
+      await apiFetch('/pdv/produtos', {
+        method: 'POST',
+        body: JSON.stringify({
+          nome: novoProduto.nome,
+          sku: novoProduto.sku || undefined,
+          precoVenda: Number(novoProduto.precoVenda),
+          custoUnitario: novoProduto.custoUnitario ? Number(novoProduto.custoUnitario) : undefined,
+          estoqueAtual: novoProduto.estoqueAtual ? Number(novoProduto.estoqueAtual) : undefined,
+          estoqueMinimo: novoProduto.estoqueMinimo ? Number(novoProduto.estoqueMinimo) : undefined,
+        }),
+      });
+      setNovoProdutoOpen(false);
+      setNovoProduto({ nome: '', sku: '', precoVenda: '', custoUnitario: '', estoqueAtual: '', estoqueMinimo: '' });
+      setMessage('Produto cadastrado com sucesso.');
+      await carregar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao cadastrar produto.');
+    } finally {
+      setCriandoProduto(false);
+    }
+  }
+
   function adicionarAoCarrinho(produto: Produto) {
     setCarrinho((atual) => {
       const existente = atual.find((item) => item.produtoId === produto.id);
@@ -142,18 +178,27 @@ export default function PdvPage() {
         icon={ShoppingCart}
         color="emerald"
         actions={
-          caixaAberto ? (
+          <div className="flex items-center gap-2">
             <Button
               variant="secondary"
-              icon={<Lock className="h-4 w-4" />}
-              onClick={() => {
-                setValorFechamento(String(Number(caixa!.valorAbertura) + total));
-                setFecharCaixaOpen(true);
-              }}
+              icon={<Plus className="h-4 w-4" />}
+              onClick={() => setNovoProdutoOpen(true)}
             >
-              Fechar caixa
+              Novo produto
             </Button>
-          ) : undefined
+            {caixaAberto && (
+              <Button
+                variant="secondary"
+                icon={<Lock className="h-4 w-4" />}
+                onClick={() => {
+                  setValorFechamento(String(Number(caixa!.valorAbertura) + total));
+                  setFecharCaixaOpen(true);
+                }}
+              >
+                Fechar caixa
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -192,7 +237,12 @@ export default function PdvPage() {
                 <EmptyState
                   icon={Package}
                   title="Nenhum produto cadastrado"
-                  description="Cadastre produtos pela API para começar a vender."
+                  description="Cadastre seu primeiro produto para começar a vender."
+                  action={
+                    <Button icon={<Plus className="h-4 w-4" />} onClick={() => setNovoProdutoOpen(true)}>
+                      Novo produto
+                    </Button>
+                  }
                 />
               </div>
             ) : (
@@ -278,6 +328,85 @@ export default function PdvPage() {
           onChange={(e) => setValorFechamento(e.target.value)}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={novoProdutoOpen}
+        title="Novo produto"
+        confirmLabel="Cadastrar"
+        loading={criandoProduto}
+        onCancel={() => setNovoProdutoOpen(false)}
+        onConfirm={criarProduto}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Nome</label>
+            <input
+              required
+              value={novoProduto.nome}
+              onChange={(e) => setNovoProduto({ ...novoProduto, nome: e.target.value })}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Preço de venda</label>
+              <input
+                required
+                type="number"
+                min="0"
+                step="0.01"
+                value={novoProduto.precoVenda}
+                onChange={(e) => setNovoProduto({ ...novoProduto, precoVenda: e.target.value })}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Custo unitário</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={novoProduto.custoUnitario}
+                onChange={(e) => setNovoProduto({ ...novoProduto, custoUnitario: e.target.value })}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Estoque inicial</label>
+              <input
+                type="number"
+                min="0"
+                value={novoProduto.estoqueAtual}
+                onChange={(e) => setNovoProduto({ ...novoProduto, estoqueAtual: e.target.value })}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Estoque mínimo</label>
+              <input
+                type="number"
+                min="0"
+                value={novoProduto.estoqueMinimo}
+                onChange={(e) => setNovoProduto({ ...novoProduto, estoqueMinimo: e.target.value })}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">SKU (opcional)</label>
+            <input
+              value={novoProduto.sku}
+              onChange={(e) => setNovoProduto({ ...novoProduto, sku: e.target.value })}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
       </ConfirmDialog>
     </AppShell>
   );

@@ -14,8 +14,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
+  // Gradiente vem de --brand-primary/--brand-secondary (globals.css), sobrescrito
+  // em runtime por apply-brand-theme.ts com as cores da empresa quando definidas.
   primary:
-    'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm hover:from-indigo-700 hover:to-violet-700 hover:shadow-md hover:scale-[1.01]',
+    'bg-[linear-gradient(to_right,var(--brand-primary),var(--brand-secondary))] text-white shadow-sm hover:bg-[linear-gradient(to_right,var(--brand-primary-hover),var(--brand-secondary))] hover:shadow-md hover:scale-[1.01]',
   secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
   danger: 'bg-red-600 text-white hover:bg-red-700',
   ghost: 'bg-transparent text-slate-600 hover:bg-slate-100',

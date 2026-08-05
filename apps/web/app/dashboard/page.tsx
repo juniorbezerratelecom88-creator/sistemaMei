@@ -8,9 +8,23 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatCard } from '../../components/StatCard';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
-import { CardSkeleton } from '../../components/ui/Skeleton';
+import { CardSkeleton, Skeleton } from '../../components/ui/Skeleton';
+import { CashFlowChart, type DiaFluxoCaixa } from '../../components/charts/CashFlowChart';
+import { TopProductsChart } from '../../components/charts/TopProductsChart';
+import { RevenueSplitBar } from '../../components/charts/RevenueSplitBar';
 import { apiFetch } from '../../lib/api-client';
 import { usePageTitle } from '../../lib/use-page-title';
+
+interface FluxoCaixaRealizado {
+  dias: DiaFluxoCaixa[];
+  totalEntradas: number;
+  totalSaidas: number;
+}
+
+interface DasnRelatorio {
+  receitaComNota: number;
+  receitaSemNota: number;
+}
 
 function formatBRL(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -20,17 +34,26 @@ export default function DashboardPage() {
   usePageTitle('Dashboard');
   const [resumo, setResumo] = useState<DashboardResumo | null>(null);
   const [termometro, setTermometro] = useState<TermometroFaturamento | null>(null);
+  const [fluxoCaixa, setFluxoCaixa] = useState<FluxoCaixaRealizado | null>(null);
+  const [dasn, setDasn] = useState<DasnRelatorio | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const hoje = new Date();
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10);
+
     Promise.all([
       apiFetch<DashboardResumo>('/dashboard/resumo'),
       apiFetch<TermometroFaturamento>('/faturamento/termometro'),
+      apiFetch<FluxoCaixaRealizado>(`/financeiro/fluxo-caixa/realizado?dataInicio=${inicioMes}`),
+      apiFetch<DasnRelatorio>('/faturamento/dasn'),
     ])
-      .then(([resumoData, termometroData]) => {
+      .then(([resumoData, termometroData, fluxoCaixaData, dasnData]) => {
         setResumo(resumoData);
         setTermometro(termometroData);
+        setFluxoCaixa(fluxoCaixaData);
+        setDasn(dasnData);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar dashboard.'))
       .finally(() => setLoading(false));
@@ -106,21 +129,34 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {resumo && resumo.produtosMaisVendidos.length > 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-sm font-medium text-slate-500">Produtos mais vendidos (mês)</p>
-          <ul className="divide-y divide-slate-100">
-            {resumo.produtosMaisVendidos.map((produto) => (
-              <li key={produto.produtoId} className="flex justify-between py-2 text-sm">
-                <span>{produto.nome}</span>
-                <span className="text-slate-500">
-                  {produto.quantidadeVendida} un · {formatBRL(produto.totalVendido)}
-                </span>
-              </li>
-            ))}
-          </ul>
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+          <p className="mb-1 text-sm font-medium text-slate-500">Fluxo de caixa diário (mês)</p>
+          {loading ? (
+            <Skeleton className="h-60 w-full" />
+          ) : (
+            <CashFlowChart dias={fluxoCaixa?.dias ?? []} />
+          )}
         </div>
-      )}
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="mb-1 text-sm font-medium text-slate-500">Produtos mais vendidos (mês)</p>
+          {loading ? (
+            <Skeleton className="h-60 w-full" />
+          ) : (
+            <TopProductsChart produtos={resumo?.produtosMaisVendidos ?? []} />
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="mb-3 text-sm font-medium text-slate-500">Receita com nota vs. sem nota (ano)</p>
+        {loading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : (
+          <RevenueSplitBar receitaComNota={dasn?.receitaComNota ?? 0} receitaSemNota={dasn?.receitaSemNota ?? 0} />
+        )}
+      </div>
     </AppShell>
   );
 }

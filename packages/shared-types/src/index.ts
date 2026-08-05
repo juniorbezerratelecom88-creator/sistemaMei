@@ -79,6 +79,9 @@ export interface Empresa {
   nomeFantasia?: string | null;
   atividade: AtividadeMei;
   dataAbertura: string;
+  logoUrl?: string | null;
+  corPrimaria?: string | null;
+  corSecundaria?: string | null;
 }
 
 export interface Produto {

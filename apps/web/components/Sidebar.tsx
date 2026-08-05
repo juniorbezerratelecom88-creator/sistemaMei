@@ -2,20 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import type { Empresa } from '@sistema-mei/shared-types';
 import {
   Building2,
   FileText,
   LayoutDashboard,
   LogOut,
   Receipt,
+  ShieldCheck,
   ShoppingCart,
   Wallet,
-  Wallet2,
   X,
 } from 'lucide-react';
 import { clearTokens, getTokens } from '../lib/api-client';
 import { decodeJwtPayload } from '../lib/jwt';
 import { cn } from '../lib/cn';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 const LINKS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -24,9 +27,18 @@ const LINKS = [
   { href: '/notas', label: 'Notas Fiscais', icon: FileText },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/empresa', label: 'Empresa', icon: Building2 },
+  { href: '/auditoria', label: 'Auditoria', icon: ShieldCheck },
 ];
 
-export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
+export function Sidebar({
+  mobileOpen,
+  onClose,
+  empresa,
+}: {
+  mobileOpen: boolean;
+  onClose: () => void;
+  empresa?: Empresa | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { accessToken } = getTokens();
@@ -47,10 +59,24 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
         <div>
           <div className="mb-8 flex items-center justify-between px-1">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 shadow-sm">
-                <Wallet2 className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-lg font-bold text-white">Sistema MEI</span>
+              {empresa?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`${API_URL}${empresa.logoUrl}`}
+                  alt={empresa.razaoSocial}
+                  className="h-9 w-9 flex-shrink-0 rounded-lg object-cover shadow-sm"
+                />
+              ) : (
+                <div
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg shadow-sm"
+                  style={{ backgroundImage: 'linear-gradient(to bottom right, var(--brand-primary), var(--brand-secondary))' }}
+                >
+                  <Building2 className="h-5 w-5 text-white" />
+                </div>
+              )}
+              <span className="truncate text-lg font-bold text-white">
+                {empresa?.nomeFantasia || empresa?.razaoSocial || 'Sistema MEI'}
+              </span>
             </div>
             <button onClick={onClose} className="text-slate-400 hover:text-white lg:hidden" aria-label="Fechar menu">
               <X className="h-5 w-5" />
@@ -69,7 +95,7 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                     active
-                      ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-sm'
+                      ? 'bg-[linear-gradient(to_right,var(--brand-primary),var(--brand-secondary))] text-white shadow-sm'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-white',
                   )}
                 >

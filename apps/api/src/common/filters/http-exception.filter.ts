@@ -8,6 +8,21 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+/**
+ * `HttpException.getResponse()` normalmente já retorna um objeto
+ * `{statusCode, message, error}` (as exceções built-in do Nest e o
+ * ValidationPipe montam esse objeto sozinhas) - por isso não dá pra colocar
+ * o retorno cru dentro de outro campo `message`, senão o corpo final vira
+ * `message: { message: '...' }` e o cliente exibe "[object Object]".
+ */
+function extractMessage(response: string | object): string {
+  if (typeof response === 'string') return response;
+  const body = response as { message?: string | string[] };
+  if (Array.isArray(body.message)) return body.message.join(' ');
+  if (typeof body.message === 'string') return body.message;
+  return 'Erro na requisição.';
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -23,7 +38,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const message = isHttpException
-      ? exception.getResponse()
+      ? extractMessage(exception.getResponse())
       : 'Erro interno do servidor';
 
     if (!isHttpException) {

@@ -9,9 +9,11 @@ import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
 import { createHash, randomBytes } from 'crypto';
+import { EventoAuditoria } from '@prisma/client';
 import ms from '../../common/utils/ms';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from '../../common/crypto/crypto.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './auth.types';
@@ -28,6 +30,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly crypto: CryptoService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -53,12 +56,20 @@ export class AuthService {
     return this.issueTokenPair(user.id, user.email, user.role, user.empresaId);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ip: string, userAgent?: string) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user || !(await argon2.verify(user.passwordHash, dto.password))) {
+      await this.auditoria.registrar({
+        email: dto.email,
+        evento: EventoAuditoria.LOGIN_FALHA,
+        ip,
+        userAgent,
+        userId: user?.id,
+        empresaId: user?.empresaId,
+      });
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
@@ -73,10 +84,24 @@ export class AuthService {
       return { requiresTwoFactor: true, twoFactorToken };
     }
 
+    await this.auditoria.registrar({
+      userId: user.id,
+      empresaId: user.empresaId,
+      email: user.email,
+      evento: EventoAuditoria.LOGIN_SUCESSO,
+      ip,
+      userAgent,
+    });
+
     return this.issueTokenPair(user.id, user.email, user.role, user.empresaId);
   }
 
-  async verifyTwoFactorLogin(twoFactorToken: string, code: string) {
+  async verifyTwoFactorLogin(
+    twoFactorToken: string,
+    code: string,
+    ip: string,
+    userAgent?: string,
+  ) {
     let decoded: { sub: string; stage: string };
     try {
       decoded = this.jwt.verify(twoFactorToken, {
@@ -101,8 +126,25 @@ export class AuthService {
     const secret = this.crypto.decrypt(user.twoFactorSecretCipher);
     const valid = authenticator.check(code, secret);
     if (!valid) {
+      await this.auditoria.registrar({
+        userId: user.id,
+        empresaId: user.empresaId,
+        email: user.email,
+        evento: EventoAuditoria.LOGIN_FALHA,
+        ip,
+        userAgent,
+      });
       throw new UnauthorizedException('Código de verificação inválido.');
     }
+
+    await this.auditoria.registrar({
+      userId: user.id,
+      empresaId: user.empresaId,
+      email: user.email,
+      evento: EventoAuditoria.LOGIN_2FA_SUCESSO,
+      ip,
+      userAgent,
+    });
 
     return this.issueTokenPair(user.id, user.email, user.role, user.empresaId);
   }

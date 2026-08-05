@@ -1,7 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { RoleName } from '@prisma/client';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
+import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 
 @Injectable()
 export class EmpresasService {
@@ -37,5 +40,39 @@ export class EmpresasService {
 
   findById(id: string) {
     return this.prisma.empresa.findUniqueOrThrow({ where: { id } });
+  }
+
+  async update(empresaId: string, dto: UpdateEmpresaDto) {
+    if (dto.cnpj) {
+      const existing = await this.prisma.empresa.findUnique({
+        where: { cnpj: dto.cnpj },
+      });
+      if (existing && existing.id !== empresaId) {
+        throw new ConflictException('CNPJ já cadastrado para outra empresa.');
+      }
+    }
+
+    return this.prisma.empresa.update({
+      where: { id: empresaId },
+      data: dto,
+    });
+  }
+
+  async updateLogo(empresaId: string, logoUrl: string) {
+    const empresa = await this.prisma.empresa.findUniqueOrThrow({
+      where: { id: empresaId },
+    });
+
+    if (empresa.logoUrl) {
+      const oldPath = join(process.cwd(), empresa.logoUrl.replace(/^\//, ''));
+      await unlink(oldPath).catch(() => {
+        // arquivo antigo pode já não existir - não é um erro fatal
+      });
+    }
+
+    return this.prisma.empresa.update({
+      where: { id: empresaId },
+      data: { logoUrl },
+    });
   }
 }
