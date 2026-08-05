@@ -313,7 +313,7 @@ export default function EmpresaPage() {
                     {logoPreview || empresa.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={logoPreview ?? empresa.logoUrl}
+                        src={logoPreview ?? empresa.logoUrl ?? undefined}
                         alt="Logo da empresa"
                         className="h-full w-full object-cover"
                       />
