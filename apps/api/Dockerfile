@@ -14,5 +14,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY apps/api/start.sh ./start.sh
+RUN chmod +x ./start.sh
 EXPOSE 3001
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["./start.sh"]
