@@ -95,10 +95,6 @@ function LoginForm() {
               Entrar
             </Button>
           </form>
-
-          <p className="mt-6 text-center text-xs text-slate-400">
-            Login de teste (seed): admin@sistemamei.com.br / Senha@Forte123
-          </p>
         </div>
       </div>
 
