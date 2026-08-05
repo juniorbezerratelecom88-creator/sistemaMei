@@ -21,9 +21,6 @@ Thumbs.db
 apps/api/prisma/dev.db
 apps/api/generated/
 
-# Uploads de usuário (logos, etc.) - conteúdo local, não versiona
-apps/api/uploads/
-
 # Redis dump gerado por uma instância local rodando fora do Docker
 dump.rdb
 

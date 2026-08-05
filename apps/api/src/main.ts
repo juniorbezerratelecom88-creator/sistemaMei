@@ -1,20 +1,14 @@
 import 'reflect-metadata';
 import helmet from 'helmet';
-import { mkdirSync } from 'fs';
-import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  // Diretorio de uploads (logos da empresa) - criado antes do multer precisar dele.
-  mkdirSync(join(process.cwd(), 'uploads', 'logos'), { recursive: true });
-
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
   app.use(
@@ -41,10 +35,6 @@ async function bootstrap() {
     origin: allowedOrigins.length > 0 ? allowedOrigins : false,
     credentials: true,
   });
-
-  // Registrado depois do CORS para que os arquivos enviados (logos) também
-  // saiam com os cabeçalhos de CORS corretos.
-  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
   app.useGlobalPipes(
     new ValidationPipe({

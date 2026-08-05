@@ -9,8 +9,6 @@ import { PageSpinner } from './ui/Spinner';
 import { SESSION_EXPIRED_EVENT, apiFetch, clearTokens, getTokens } from '../lib/api-client';
 import { applyBrandTheme } from '../lib/apply-brand-theme';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -66,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {empresa?.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`${API_URL}${empresa.logoUrl}`}
+                src={empresa.logoUrl}
                 alt={empresa.razaoSocial}
                 className="h-7 w-7 flex-shrink-0 rounded-md object-cover"
               />

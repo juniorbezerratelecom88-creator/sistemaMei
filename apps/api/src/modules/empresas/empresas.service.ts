@@ -1,7 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { RoleName } from '@prisma/client';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
@@ -58,18 +56,7 @@ export class EmpresasService {
     });
   }
 
-  async updateLogo(empresaId: string, logoUrl: string) {
-    const empresa = await this.prisma.empresa.findUniqueOrThrow({
-      where: { id: empresaId },
-    });
-
-    if (empresa.logoUrl) {
-      const oldPath = join(process.cwd(), empresa.logoUrl.replace(/^\//, ''));
-      await unlink(oldPath).catch(() => {
-        // arquivo antigo pode já não existir - não é um erro fatal
-      });
-    }
-
+  updateLogo(empresaId: string, logoUrl: string) {
     return this.prisma.empresa.update({
       where: { id: empresaId },
       data: { logoUrl },

@@ -18,8 +18,6 @@ import { clearTokens, getTokens } from '../lib/api-client';
 import { decodeJwtPayload } from '../lib/jwt';
 import { cn } from '../lib/cn';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
 const LINKS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pdv', label: 'PDV', icon: ShoppingCart },
@@ -62,7 +60,7 @@ export function Sidebar({
               {empresa?.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={`${API_URL}${empresa.logoUrl}`}
+                  src={empresa.logoUrl}
                   alt={empresa.razaoSocial}
                   className="h-9 w-9 flex-shrink-0 rounded-lg object-cover shadow-sm"
                 />
